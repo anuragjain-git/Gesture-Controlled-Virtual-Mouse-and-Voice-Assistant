@@ -1,4 +1,5 @@
 import eel  # Eel is a Python library that allows us to build a web-based GUI, while still running backend logic in Python
+import socket # Import socket to find a free available port
 import os  # Used for working with file paths
 from queue import Queue  # Queue is used for managing user input messages
 
@@ -62,6 +63,16 @@ class ChatBot:
         """
         eel.addAppMsg(msg)
 
+    def find_free_port():
+        """
+        Finds an available port dynamically to avoid conflicts with other applications.
+        """
+        sock = socket.socket() # Create a new socket object
+        sock.bind(('localhost', 0))  # Bind to an available port (0 lets the OS choose)
+        port = sock.getsockname()[1] # Get the assigned port number (available port number)
+        sock.close() # Close the socket to free up resources
+        return port 
+
     @staticmethod
     def start():
         """
@@ -77,7 +88,7 @@ class ChatBot:
                 'index.html',  # Main HTML file to open
                 mode=None,  # Open in the system's default browser for better compatibility
                 host='localhost',  # Local server
-                port=5000,  # Port for the web interface
+                port=ChatBot.find_free_port(),  # Get a free port dynamically to avoid conflicts
                 block=False,  # Non-blocking mode so the script continues running
                 size=(350, 480),  # Window size
                 position=(10, 100),  # Window position
