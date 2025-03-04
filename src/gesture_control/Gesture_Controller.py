@@ -14,7 +14,7 @@ pyautogui.FAILSAFE = False
 
 # Initialize MediaPipe utilities
 mp_drawing = mp.solutions.drawing_utils  # Used for drawing hand landmarks on the screen
-mp_hands = mp.solutions.hands  # Provides hand-tracking capabilities
+mp_hands = mp.solutions.hands  # Provides pre-trained hand tracking models that detect hands and extract 21 landmark points per hand
 
 # Gesture Encodings 
 class Gest(IntEnum):
@@ -158,7 +158,8 @@ class HandRecog:
         if self.hand_result is None:
             return
 
-        # Points representing the tip, middle knuckle, and base knuckle for each finger
+        # Points representing the tip, middle knuckle, and base knuckle for each finger.
+        # Source: https://mediapipe.readthedocs.io/en/latest/solutions/hands.html#hand-landmark-model
         points = [[8, 5, 0], [12, 9, 0], [16, 13, 0], [20, 17, 0]]
         self.finger = 0
 
@@ -272,7 +273,7 @@ class Controller:
     # Class-level attributes (shared across all instances)
     tx_old = 0  # Old x-coordinate for cursor stabilization
     ty_old = 0  # Old y-coordinate for cursor stabilization
-    trial = True  # Unused attribute (potentially for debugging)
+    trial = True  
     flag = False  # Indicates if 'V' gesture is detected
     grabflag = False  # Indicates if 'FIST' gesture is detected
     pinchmajorflag = False  # Tracks if major hand is pinching
@@ -373,6 +374,53 @@ class Controller:
         Controller.pinchlv = 0  # Reset pinch level
         Controller.prevpinchlv = 0  # Reset previous pinch level
         Controller.framecount = 0  # Reset frame counter
+
+    # Hold final position for 5 frames to change status
+    def pinch_control(hand_result, controlHorizontal, controlVertical):
+        """
+        calls 'controlHorizontal' or 'controlVertical' based on pinch flags, 
+
+        Parameters
+        ----------
+        hand_result : Object
+            Landmarks obtained from mediapipe.
+        controlHorizontal : callback function assosiated with horizontal
+            pinch gesture.
+        controlVertical : callback function assosiated with vertical
+            pinch gesture. 
+        
+        Returns
+        -------
+        None
+        """
+        if Controller.framecount == 5:
+            Controller.framecount = 0
+            Controller.pinchlv = Controller.prevpinchlv
+
+            if Controller.pinchdirectionflag == True:
+                controlHorizontal() #x
+
+            elif Controller.pinchdirectionflag == False:
+                controlVertical() #y
+
+        lvx =  Controller.getpinchxlv(hand_result)
+        lvy =  Controller.getpinchylv(hand_result)
+            
+        if abs(lvy) > abs(lvx) and abs(lvy) > Controller.pinch_threshold:
+            Controller.pinchdirectionflag = False
+            if abs(Controller.prevpinchlv - lvy) < Controller.pinch_threshold:
+                Controller.framecount += 1
+            else:
+                Controller.prevpinchlv = lvy
+                Controller.framecount = 0
+
+        elif abs(lvx) > Controller.pinch_threshold:
+            Controller.pinchdirectionflag = True
+            if abs(Controller.prevpinchlv - lvx) < Controller.pinch_threshold:
+                Controller.framecount += 1
+            else:
+                Controller.prevpinchlv = lvx
+                Controller.framecount = 0
     
     def handle_controls(gesture, hand_result):
         """Executes different actions based on detected hand gestures."""
@@ -384,7 +432,14 @@ class Controller:
         if gesture != Gest.FIST and Controller.grabflag:
             Controller.grabflag = False
             pyautogui.mouseUp(button="left")
+
+        if gesture != Gest.PINCH_MAJOR and Controller.pinchmajorflag:
+            Controller.pinchmajorflag = False
+
+        if gesture != Gest.PINCH_MINOR and Controller.pinchminorflag:
+            Controller.pinchminorflag = False
         
+        # Implementation
         if gesture == Gest.V_GEST:
             Controller.flag = True
             pyautogui.moveTo(x, y, duration=0.1)  # Move cursor smoothly
@@ -394,6 +449,18 @@ class Controller:
                 Controller.grabflag = True
                 pyautogui.mouseDown(button="left")  # Start dragging
             pyautogui.moveTo(x, y, duration=0.1)  # Move cursor while dragging
+
+        elif gesture == Gest.MID and Controller.flag:
+            pyautogui.click()
+            Controller.flag = False
+
+        elif gesture == Gest.INDEX and Controller.flag:
+            pyautogui.click(button='right')
+            Controller.flag = False
+
+        elif gesture == Gest.TWO_FINGER_CLOSED and Controller.flag:
+            pyautogui.doubleClick()
+            Controller.flag = False
         
         elif gesture == Gest.PINCH_MAJOR:
             if not Controller.pinchmajorflag:
@@ -440,7 +507,7 @@ class GestureController:
         Initializes attributes and starts capturing video from the default camera.
         """
         GestureController.gc_mode = 1  # Enable gesture controller
-        GestureController.cap = cv2.VideoCapture(0)  # Open the default camera (ID 0)
+        GestureController.cap = cv2.VideoCapture(0)  # Open the default camera (ID 0 = primary camera)
         
         # Get the height and width of the camera frame
         GestureController.CAM_HEIGHT = GestureController.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -468,6 +535,24 @@ class GestureController:
         # Process the first detected hand
         try:
             handedness_dict = MessageToDict(results.multi_handedness[0])
+            """
+            example output of results.multi_handedness:
+
+            {
+                "multi_handedness": [
+                    {
+                        "classification": [
+                            {
+                                "label": "Left",
+                                "score": 0.98
+                            }
+                        ]
+                    },
+                    {for right hand}
+                ]
+            }
+
+            """
             if handedness_dict['classification'][0]['label'] == 'Right':
                 right = results.multi_hand_landmarks[0]  # Assign to right hand
             else:
@@ -522,14 +607,20 @@ class GestureController:
                 # Flip the image horizontally and convert color from BGR to RGB (required by MediaPipe)
                 image = cv2.cvtColor(cv2.flip(image, 1), cv2.COLOR_BGR2RGB)
                 image.flags.writeable = False  # Optimize performance for MediaPipe
+                # results variable contains the output of the MediaPipe Hand Tracking model, which includes detected hand landmarks, hand classification (left/right), and tracking status.
                 results = hands.process(image)  # Process the image with MediaPipe Hand Tracking
                 
                 # Convert image back to BGR for OpenCV display
-                image.flags.writeable = True
+                image.flags.writeable = True # To draw landmarks
                 image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-                if results.multi_hand_landmarks:  # If hands are detected
-                    GestureController.classify_hands(results)  # Classify hands as major/minor
+                if results.multi_hand_landmarks:  # If list of hand landmarks are detected, example-output: [landmarks\_object1, landmarks\_object2] (if multiple hands are detected)
+                    # this will print all 21 landmark coordinate
+                    # for idx, landmark in enumerate(results.multi_hand_landmarks[0].landmark):
+                    #     print(f"Landmark {idx}: x={landmark.x}, y={landmark.y}, z={landmark.z}")
+                    
+                    # Classify hands as major/minor
+                    GestureController.classify_hands(results)
                     
                     # Update gesture recognition objects with current hand landmarks
                     handmajor.update_hand_result(GestureController.hr_major)
