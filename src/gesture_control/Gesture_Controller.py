@@ -299,7 +299,7 @@ class Controller:
     
     def changesystembrightness():
         """Changes system brightness based on pinch movement."""
-        currentBrightnessLv = sbcontrol.get_brightness(display=0) / 100.0  # Get current brightness level (0 to 1 scale)
+        currentBrightnessLv = sbcontrol.get_brightness(display=0)[0] / 100.0  # Get current brightness level (0 to 1 scale)
         currentBrightnessLv += Controller.pinchlv / 50.0  # Adjust brightness based on pinch level
         
         # Ensure brightness is within valid range (0 to 1)
@@ -308,7 +308,7 @@ class Controller:
         elif currentBrightnessLv < 0.0:
             currentBrightnessLv = 0.0  
         
-        sbcontrol.fade_brightness(int(100 * currentBrightnessLv), start=sbcontrol.get_brightness(display=0))  # Apply brightness change
+        sbcontrol.fade_brightness(int(100 * currentBrightnessLv), start=sbcontrol.get_brightness(display=0)[0])  # Apply brightness change
     
     def changesystemvolume():
         """Changes system volume based on pinch movement."""
