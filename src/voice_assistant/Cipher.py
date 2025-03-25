@@ -1,125 +1,258 @@
-import pyttsx3  # Text-to-speech conversion library
-import speech_recognition as sr  # Library for speech recognition
-from datetime import date  # Get today's date
-import time  # Used for time-based functions like sleep
-import webbrowser  # Open web pages in the browser
-import datetime  # Work with date and time
-from pynput.keyboard import Key, Controller  # Control keyboard actions programmatically
-import pyautogui  # Automate GUI interactions like clicks and key presses
-import sys  # System functions like exiting the program
-import os  # Interact with the operating system
-from os import listdir  # List files in a directory
-from os.path import isfile, join  # Check if a path is a file and join paths
-import smtplib  # Send emails (not used here but can be useful)
-import wikipedia  # Fetch information from Wikipedia
-from gesture_control import Gesture_Controller # Import gesture control functionality
-import app  # Custom chatbot application
-from threading import Thread  # Run multiple tasks at the same time
+import pyttsx3                      # For text-to-speech conversion
+import speech_recognition as sr     # For capturing and recognizing speech
+from datetime import date, datetime # For getting current date and time
+import time                         # For sleep and time-based functions
+import webbrowser                   # To open URLs in the default web browser
+from pynput.keyboard import Key, Controller  # To simulate keyboard inputs
+import pyautogui                    # For GUI automation (e.g., simulating mouse and keyboard actions)
+import sys                          # For system-specific functions (e.g., exiting the program)
+import os                           # For interacting with the operating system (e.g., file management)
+from os import listdir              # To list files in a directory
+from os.path import isfile, join    # To check if a path is a file and join paths
+import spacy                        # For Natural Language Processing (NLP) and Named Entity Recognition (NER)
+import subprocess                   # To launch or close applications using system commands
+from threading import Thread        # To run processes in parallel (e.g., launching the GUI)
 
-# -------------Object Initialization---------------
-today = date.today()  # Get today's date
-r = sr.Recognizer()  # Initialize speech recognition
-keyboard = Controller()  # Create a keyboard controller
-engine = pyttsx3.init('sapi5')  # Initialize text-to-speech engine with sapi5 (for Windows)
-engine = pyttsx3.init()  # Initialize text-to-speech engine again (redundant, remove one)
-voices = engine.getProperty('voices')  # Get available voices
-engine.setProperty('voice', voices[0].id)  # Set the voice (0 for default)
+from features import open_close_app  # Import functions for opening/closing applications
+# Fix ImportError by adding the parent directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from gesture_control import Gesture_Controller  # Import Gesture Controller module
+import app                          # Assuming this is your GUI module (e.g., chatbot interface)
 
-# ----------------Variables------------------------
-file_exp_status = False  # Track if file explorer is active
-files = []  # Store list of files
-path = ''  # Store the current directory path
-is_awake = True  # Track bot status (awake/sleeping)
+# ------------ Object Initialization ------------
+today = date.today()                # Store today's date
+r = sr.Recognizer()                  # Create a Recognizer object for speech recognition
+keyboard = Controller()             # Create a Controller object for keyboard actions
+engine = pyttsx3.init()             # Initialize the text-to-speech engine
+voices = engine.getProperty('voices')  # Retrieve available voices
+engine.setProperty('voice', voices[0].id) # Set the default voice (usually the first one)
 
-# ------------------Functions----------------------
-def reply(audio):  # Function to make the bot speak and display responses
-    app.ChatBot.addAppMsg(audio)  # Display response in chatbot GUI
-    print(audio)  # Print response
-    engine.say(audio)  # Convert text to speech
-    engine.runAndWait()  # Wait until speaking finishes
+# Load spaCy model for NER and intent detection (using a small English model)
+nlp = spacy.load("en_core_web_sm")
 
-def wish():  # Function to greet user based on time
-    hour = int(datetime.datetime.now().hour)  # Get current hour
-    if hour >= 0 and hour < 12:
+# ------------ Variables ------------
+is_awake = True                     # Flag to check if the assistant is active (awake) or asleep
+context = {}                        # Dictionary to store conversation context (e.g., reminder details)
+
+# ------------ Functions ------------
+
+def reply(audio):
+    """
+    Sends the response text to both the GUI and the text-to-speech engine.
+    
+    Parameters:
+        audio (str): The text to be spoken and displayed.
+    """
+    app.ChatBot.addAppMsg(audio)    # Add message to the chatbot GUI
+    print(audio)                    # Print the message in the console
+    engine.say(audio)               # Convert text to speech
+    engine.runAndWait()             # Wait until speaking is finished
+
+def wish():
+    """
+    Greets the user based on the current time of day.
+    """
+    hour = datetime.now().hour      # Get the current hour (0-23)
+    if 0 <= hour < 12:
         reply("Good Morning!")
-    elif hour >= 12 and hour < 18:
+    elif 12 <= hour < 18:
         reply("Good Afternoon!")
     else:
         reply("Good Evening!")
-    reply("I am Cipher, how may I help you?")
+    reply("I am Cipher, How can I assist you?")
 
-# Set Microphone parameters
+# Microphone setup: Configure energy thresholds for speech recognition
 with sr.Microphone() as source:
-    r.energy_threshold = 500  # Set threshold for recognizing voice
-    r.dynamic_energy_threshold = False  # Disable automatic threshold adjustment
+    r.energy_threshold = 500                # Set the minimum energy threshold for voice detection
+    r.dynamic_energy_threshold = False      # Disable dynamic energy threshold adjustment
 
-def record_audio():  # Function to record voice input
+def record_audio():
+    """
+    Captures audio from the microphone, recognizes speech using Google API,
+    and returns the recognized text in lowercase.
+    
+    Returns:
+        str: The recognized voice command in lowercase.
+    """
     with sr.Microphone() as source:
-        r.pause_threshold = 0.8  # Pause duration before processing
-        voice_data = ''  # Store recognized text
-        audio = r.listen(source, phrase_time_limit=5)  # Listen for input (max 5 seconds)
+        print("Listening...")
+        r.pause_threshold = 0.8
+        r.adjust_for_ambient_noise(source, duration=1)  # Makes speech recognition strong(robust) by automatically adapting to the current noise conditions.
         try:
-            voice_data = r.recognize_google(audio)  # Convert speech to text using Google
+            
+            audio = r.listen(source, phrase_time_limit=5) # Listen for up to 5 seconds of speech
+            voice_data = r.recognize_google(audio)         # Use Google's speech recognition API
+            return voice_data.lower()                      # Return the recognized text in lowercase
         except sr.RequestError:
-            reply('Sorry my Service is down. Plz check your Internet connection')  # Handle errors
+            reply("Sorry, my service is down. Please check your internet connection.")
+            return ""
         except sr.UnknownValueError:
-            print('cant recognize')  # Handle unrecognized speech
-            pass
-        return voice_data.lower()  # Return lowercase text
+            print("Can't recognize")
+            return ""
 
-def respond(voice_data):  # Process user commands
-    global file_exp_status, files, is_awake, path  # Use global variables
-    print(voice_data)  # Print recognized command
-    voice_data.replace('cipher', '')  # Remove bot name from command
-    app.eel.addUserMsg(voice_data)  # Display user message in chatbot
-    if is_awake == False:  # If bot is sleeping
-        if 'wake up' in voice_data:
-            is_awake = True  # Wake up bot
-            wish()  # Greet user
-    elif 'hello' in voice_data:
-        wish()  # Greet user if they say "hello"
-    elif 'what is your name' in voice_data:
-        reply('My name is Cipher!')
-    elif 'date' in voice_data:
-        reply(today.strftime("%B %d, %Y"))  # Speak today's date
-    elif 'time' in voice_data:
-        reply(str(datetime.datetime.now()).split(" ")[1].split('.')[0])  # Speak current time
-    elif 'search' in voice_data:
-        reply('Searching for ' + voice_data.split('search')[1])
-        url = 'https://google.com/search?q=' + voice_data.split('search')[1]
-        try:
-            webbrowser.get().open(url)  # Open Google search
-            reply('This is what I found Sir')
-        except:
-            reply('Please check your Internet')
-    elif ('bye' in voice_data) or ('by' in voice_data):
-        reply("Good bye Sir! Have a nice day.")
-        is_awake = False  # Put bot to sleep
-    elif ('exit' in voice_data) or ('terminate' in voice_data):
-        if Gesture_Controller.GestureController.gc_mode:
-            Gesture_Controller.GestureController.gc_mode = 0
-        app.ChatBot.close()  # Close chatbot
-        sys.exit()  # Exit program
+def get_intent(voice_data):
+    """
+    Uses spaCy to perform rule-based intent detection and extract entities.
+    
+    Example 1:
+        Input: "search youtube"
+        spaCy's NER finds no entities, so fallback returns: intent = 'search', entities = {}
+
+        Returns:
+        tuple: ('search', {})
+    
+    Example 2:
+        Input: "set reminder at 5 pm"
+        spaCy's NER detects "5 pm" as a TIME entity, so returns: intent = 'set_reminder', entities = {'TIME': '5 pm'}
+        
+        Returns:
+        tuple: ('set_reminder', {'TIME': '5 pm'})
+    """
+    # Process the voice command using spaCy
+    doc = nlp(voice_data)
+    intent = "unknown"   # Default intent
+    entities = {}        # Initialize an empty dictionary for entities
+
+    # Simple rule-based intent detection based on token lemmas (base forms)
+    for token in doc:
+        if token.lemma_ in ["search", "find", "look"]:
+            intent = "search"
+        elif token.lemma_ in ["open", "launch", "start"]:
+            intent = "open"
+        elif token.lemma_ == "close":
+            intent = "close"
+        elif token.lemma_ in ["time", "clock"]:
+            intent = "time"
+        elif token.lemma_ in ["date", "today"]:
+            intent = "date"
+        # Uncomment and extend the following lines if needed:
+        # elif token.lemma_ in ["list", "show", "files"]:
+        #     intent = "list_files"
+        # elif token.lemma_ in ["set", "schedule"]:
+        #     intent = "set_reminder"
+        elif token.lemma_ == "copy":
+            intent = "copy"
+        elif token.lemma_ == "paste":
+            intent = "paste"
+        elif token.lemma_ in ["exit", "terminate", "stop"]:
+            intent = "exit"
+
+    # Use spaCy's NER to extract entities from the command
+    for ent in doc.ents:
+        entities[ent.label_] = ent.text
+
+    # Fallback: If no entities detected, try to extract a direct object (useful for commands like "open youtube")
+    if not entities:
+        for token in doc:
+            if token.dep_ == "dobj":  # Check if the token is a direct object
+                entities["object"] = token.text
+
+    return intent, entities
+
+def respond(voice_data):
+    """
+    Processes the voice command by determining intent and extracting entities,
+    then executes the corresponding action based on the intent.
+    
+    Parameters:
+        voice_data (str): The user's spoken command.
+    """
+    global is_awake, context
+    print(f"User said: {voice_data}")
+    
+    # Remove the wake word "cipher" and trim any extra spaces
+    voice_data = voice_data.replace("cipher", "").strip()
+    app.eel.addUserMsg(voice_data)  # Display the command in the chatbot GUI
+
+    # Wake-up logic: If the assistant is asleep, only process the "wake up" command.
+    if not is_awake:
+        if "wake up" in voice_data:
+            is_awake = True
+            wish()
+        return
+
+    # Determine intent and extract entities from the voice command using spaCy
+    intent, entities = get_intent(voice_data)
+
+    # If no valid intent is detected, ask the user to repeat the command.
+    if intent == "unknown":
+        reply("I didn't quite understand that. Could you try again?")
+        return
+
+    # ---------------- Static Commands ----------------
+    if intent == "time":
+        # Reply with the current time.
+        reply(str(datetime.now()).split(" ")[1].split('.')[0])
+        
+    elif intent == "date":
+        # Reply with today's date.
+        reply(today.strftime("%B %d, %Y"))
+
+    elif intent == "search":
+        # Extract the search query using NER (if available) or fallback to splitting the command.
+        query = entities.get("object", voice_data.split("search", 1)[-1].strip())
+        reply(f"Searching for {query}")
+        webbrowser.open(f"https://google.com/search?q={query}")
+
+    elif intent == "exit":
+        # Exit command: Close the chatbot GUI and terminate the program.
+        reply("Goodbye, sir! Shutting down.")
+        app.ChatBot.close()
+        sys.exit()
+
+    # ---------------- Dynamic Commands ----------------
+    elif intent == "open":
+        # Extract the target application name using NER or fallback to splitting the command.
+        target = entities.get("object", voice_data.split("open", 1)[-1].strip()).lower()
+        # Use the helper function from open_close_app to open the application.
+        reply(open_close_app.open_application(target))
+    
+
+    elif intent == "copy":
+        # Simulate CTRL+C to copy.
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('c')
+            keyboard.release('c')
+        reply("Copied")
+
+    elif intent == "paste":
+        # Simulate CTRL+V to paste.
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('v')
+            keyboard.release('v')
+        reply("Pasted")
+
     else:
-        reply('I am not functioned to do this!')
+        # Default response if the command doesn't match any known intent.
+        reply("I'm not sure how to handle that yet. I'm learning!")
 
-# ------------------Driver Code--------------------
-t1 = Thread(target=app.ChatBot.start)  # Start chatbot in a new thread
+# ------------ Driver Code ------------
+
+# Start the chatbot GUI in a separate thread.
+t1 = Thread(target=app.ChatBot.start)
 t1.start()
+
+# Wait until the chatbot GUI has fully started.
 while not app.ChatBot.started:
-    time.sleep(0.5)  # Wait for chatbot to start
-wish()  # Greet user
+    time.sleep(0.5)
+
+# Greet the user.
+wish()
+
+# Main loop: continuously listen for voice input and process commands.
 while True:
     if app.ChatBot.isUserInput():
-        voice_data = app.ChatBot.popUserInput()  # Get user input from chatbot GUI
+        voice_data = app.ChatBot.popUserInput()  # Get user input from the chatbot GUI.
     else:
-        voice_data = record_audio()  # Get user input via microphone
-    if 'cipher' in voice_data:
+        voice_data = record_audio()  # Get user input via the microphone.
+
+    # Process commands only if the wake word "cipher" is present in the voice input.
+    if "cipher" in voice_data:
         try:
-            respond(voice_data)  # Process command
+            respond(voice_data)
         except SystemExit:
-            reply("Exit Successful")
             break
-        except:
-            print("EXCEPTION raised while closing.")  # Handle errors
+        except Exception as e:
+            print(f"Error: {e}")
+            reply("Something went wrong. Let's try that again.")
             break

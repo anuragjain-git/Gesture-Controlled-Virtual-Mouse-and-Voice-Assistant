@@ -84,9 +84,8 @@ class ChatBot:
         eel.init(web_folder, allowed_extensions=['.js', '.html'])  # Initialize the frontend directory # style.css is a static file, the browser fetches it directly without needing Eel
 
         try:
-            eel.start(
-                'index.html',  # Main HTML file to open
-                mode=None,  # Open in the system's default browser for better compatibility
+            eel.start('index.html',  # Main HTML file to open
+                mode='chrome',  # Open in the system's default browser for better compatibility
                 host='localhost',  # Local server
                 port=ChatBot.find_free_port(),  # Get a free port dynamically to avoid conflicts
                 block=False,  # Non-blocking mode so the script continues running
