@@ -39,9 +39,6 @@ context = {}                        # Dictionary to store conversation context (
 def reply(audio):
     """
     Sends the response text to both the GUI and the text-to-speech engine.
-    
-    Parameters:
-        audio (str): The text to be spoken and displayed.
     """
     app.ChatBot.addAppMsg(audio)    # Add message to the chatbot GUI
     print(audio)                    # Print the message in the console
@@ -59,7 +56,7 @@ def wish():
         reply("Good Afternoon!")
     else:
         reply("Good Evening!")
-    reply("I am Cipher, How can I assist you?")
+    reply("I am Echo, How can I assist you?")
 
 # Microphone setup: Configure energy thresholds for speech recognition
 with sr.Microphone() as source:
@@ -70,9 +67,7 @@ def record_audio():
     """
     Captures audio from the microphone, recognizes speech using Google API,
     and returns the recognized text in lowercase.
-    
-    Returns:
-        str: The recognized voice command in lowercase.
+
     """
     with sr.Microphone() as source:
         print("Listening...")
@@ -119,22 +114,15 @@ def get_intent(voice_data):
             intent = "search"
         elif token.lemma_ in ["open", "launch", "start"]:
             intent = "open"
-        elif token.lemma_ == "close":
-            intent = "close"
         elif token.lemma_ in ["time", "clock"]:
             intent = "time"
         elif token.lemma_ in ["date", "today"]:
             intent = "date"
-        # Uncomment and extend the following lines if needed:
-        # elif token.lemma_ in ["list", "show", "files"]:
-        #     intent = "list_files"
-        # elif token.lemma_ in ["set", "schedule"]:
-        #     intent = "set_reminder"
         elif token.lemma_ == "copy":
             intent = "copy"
         elif token.lemma_ == "paste":
             intent = "paste"
-        elif token.lemma_ in ["exit", "terminate", "stop"]:
+        elif token.lemma_ in ["exit", "terminate", "stop", "close"]:
             intent = "exit"
 
     # Use spaCy's NER to extract entities from the command
@@ -154,14 +142,12 @@ def respond(voice_data):
     Processes the voice command by determining intent and extracting entities,
     then executes the corresponding action based on the intent.
     
-    Parameters:
-        voice_data (str): The user's spoken command.
     """
     global is_awake, context
     print(f"User said: {voice_data}")
     
     # Remove the wake word "cipher" and trim any extra spaces
-    voice_data = voice_data.replace("cipher", "").strip()
+    voice_data = voice_data.replace("echo", "").strip()
     app.eel.addUserMsg(voice_data)  # Display the command in the chatbot GUI
 
     # Wake-up logic: If the assistant is asleep, only process the "wake up" command.
@@ -195,17 +181,35 @@ def respond(voice_data):
         webbrowser.open(f"https://google.com/search?q={query}")
 
     elif intent == "exit":
-        # Exit command: Close the chatbot GUI and terminate the program.
-        reply("Goodbye, sir! Shutting down.")
-        app.ChatBot.close()
-        sys.exit()
+        if ('exit gesture recognition' in voice_data):
+            if Gesture_Controller.GestureController.gc_mode:
+                Gesture_Controller.GestureController.gc_mode = 0
+                reply('Gesture recognition stopped')
+            else:
+                reply('Gesture recognition is already inactive')
+        
+        else :
+            # Exit command: Close the chatbot GUI and terminate the program.
+            reply("Goodbye, sir! Shutting down.")
+            app.ChatBot.close()
+            sys.exit()
 
     # ---------------- Dynamic Commands ----------------
     elif intent == "open":
-        # Extract the target application name using NER or fallback to splitting the command.
-        target = entities.get("object", voice_data.split("open", 1)[-1].strip()).lower()
-        # Use the helper function from open_close_app to open the application.
-        reply(open_close_app.open_application(target))
+        if 'open gesture recognition' in voice_data:
+            if Gesture_Controller.GestureController.gc_mode:
+                reply('Gesture recognition is already active')
+            else:
+                gc = Gesture_Controller.GestureController()
+                t = Thread(target = gc.start)   
+                t.start()
+                reply('Launched Successfully')
+
+        else :
+            # Extract the target application name using NER or fallback to splitting the command.
+            target = entities.get("object", voice_data.split("open", 1)[-1].strip()).lower()
+            # Use the helper function from open_close_app to open the application.
+            reply(open_close_app.open_application(target))
     
 
     elif intent == "copy":
@@ -247,7 +251,7 @@ while True:
         voice_data = record_audio()  # Get user input via the microphone.
 
     # Process commands only if the wake word "cipher" is present in the voice input.
-    if "cipher" in voice_data:
+    if "echo" in voice_data:
         try:
             respond(voice_data)
         except SystemExit:

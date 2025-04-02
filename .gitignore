@@ -17,6 +17,3 @@ build/
 
 # Ignore logs and cache
 *.log
-
-# Ignore Python's compiled bytecode directories
-__pycache__/
