@@ -11,6 +11,11 @@ import pygetwindow as gw
 from pynput.keyboard import Key, Controller
 from datetime import datetime
 from threading import Thread
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('app_control')
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -18,7 +23,9 @@ import app
 from voice_assistant.features.utils import reply
 from voice_assistant.features.constants import WAKE_WORDS
 from gesture_control import Gesture_Controller
-from voice_assistant.features import open_application
+from voice_assistant.features.app_control_system import AppController
+
+controller = AppController()
 
 # Global state
 keyboard = Controller()
@@ -31,6 +38,7 @@ def preprocess_command(voice_data):
     for wake_word in WAKE_WORDS:
         if wake_word in voice_data:
             voice_data = voice_data.replace(wake_word, "").strip()
+            break
     
     try:
         app.eel.addUserMsg(voice_data)
@@ -88,126 +96,137 @@ def handle_paste_command():
     reply("Pasted.")
 
 def handle_open_command(voice_data, entities):
-    """Handle opening applications or features."""
+    """
+    Handle opening applications or features.
+    This is an enhanced version of the original function to use the AppController.
+    """
+    # controller = AppController()
+    
+    # Extract the application name from the command
     if "gesture recognition" in voice_data:
         if Gesture_Controller.GestureController.gc_mode:
-            reply("Gesture recognition is already active.")
+            return "Gesture recognition is already active."
         else:
             Thread(target=Gesture_Controller.GestureController().start).start()
-            reply("Gesture recognition launched.")
+            return "Gesture recognition launched."
+    
+    # Extract the application name from entities or parse from voice_data
+    target = None
+    if "object" in entities:
+        target = entities["object"]
     else:
-        # Fallback check for "open", "launch", "start"
+        # Try to extract from voice data
         for word in ["open", "launch", "start"]:
             if word in voice_data:
-                fallback = voice_data.split(word, 1)[-1].strip()
+                target = voice_data.split(word, 1)[-1].strip()
                 break
-        else:
-            fallback = voice_data
+    
+    if not target:
+        return "What application would you like to open?"
+    
+    # Use the AppController to handle the application opening
+    response, status = controller.open_application(target)
+    return response
 
-        target = entities.get("object", fallback).lower()
-        print("target = "+target)
-        opened_apps.append(target)
-        reply(open_application.open_application(target))
-
-def handle_exit_command(voice_data):
-    """Handle exit commands for apps, searches, or the assistant itself."""
-    global opened_apps, search_history
+def handle_close_command(voice_data, entities):
+    """
+    Handle closing applications.
+    This is an enhanced version of the original function to use the AppController.
+    """
+    controller = AppController()
     
     # Check if it's meant to stop the assistant
     if any(x in voice_data for x in ["assistant", "echo", "yourself", "bot"]):
+        from utils import reply
         reply("Goodbye, shutting down!")
         app.ChatBot.close()
         sys.exit()
-
-    # Extract what user wants to close
-    to_close = None
-    for word in ["exit", "terminate", "stop", "close"]:
-        if word in voice_data:
-            to_close = voice_data.split(word, 1)[-1].strip()
-            break
-
-    # === Clean up invalid entries (apps/queries already closed) ===
-    valid_search_history = []
-    for entry in search_history:
-        try:
-            if any(
-                entry["query"].lower() in w.title.lower()
-                for w in gw.getWindowsWithTitle(entry["query"])
-            ):
-                valid_search_history.append(entry)
-        except Exception:
-            continue
-    search_history[:] = valid_search_history
-
-    valid_apps = []
-    for app_name in opened_apps:
-        try:
-            tasks = os.popen(f'tasklist | findstr /I "{app_name}.exe"').read()
-            if app_name.lower() in tasks.lower():
-                valid_apps.append(app_name)
-        except Exception:
-            continue
-    opened_apps[:] = valid_apps
-
-    # === If nothing is specified, show open options ===
-    if not to_close:
-        query_list = (
-            ", ".join([entry["query"] for entry in search_history]) or "None"
-        )
-        app_list = ", ".join(opened_apps) or "None"
-        options = f"Queries: {query_list}\nApplications: {app_list}"
-        if Gesture_Controller.GestureController.gc_mode:
-            options += "\nGesture Recognition: Active"
-        if (
-            query_list == "None"
-            and app_list == "None"
-            and not Gesture_Controller.GestureController.gc_mode
-        ):
-            reply("There's nothing open to close right now.")
-        else:
-            reply("Here are things you can close:\n" + options)
-            reply("Please tell me what you'd like to close.")
-        return
-
-    # === Try closing gesture recognition ===
-    if "gesture recognition" in to_close.lower():
+    
+    # Check if it's meant to stop gesture recognition
+    if "gesture recognition" in voice_data.lower():
         if Gesture_Controller.GestureController.gc_mode:
             Gesture_Controller.GestureController.gc_mode = 0
-            reply("Gesture recognition stopped.")
+            return "Gesture recognition stopped."
         else:
-            reply("Gesture recognition is already inactive.")
-        return
+            return "Gesture recognition is already inactive."
+    
+    # Extract what user wants to close
+    target = None
+    if "object" in entities:
+        target = entities["object"]
+    else:
+        # Try to extract from voice data
+        for word in ["close", "exit", "terminate", "stop"]:
+            if word in voice_data:
+                target = voice_data.split(word, 1)[-1].strip()
+                break
+    
+    if not target:
+        # Show running applications
+        response, _ = controller.get_running_applications()
+        return response
+    
+    # Use the AppController to handle the application closing
+    response, status = controller.close_application(target)
+    return response
 
-    # === Try closing an app ===
-    for app_name in opened_apps:
-        if app_name.lower() in to_close.lower():
-            try:
-                # Use system-level command to close the app (for Windows)
-                os.system(f"taskkill /f /im {app_name}.exe")
-            except Exception as e:
-                print(f"Error closing {app_name}:", e)
-            opened_apps.remove(app_name)
-            reply(f"Closed application: {app_name}")
-            return
+def handle_user_response(voice_data):
+    """
+    Handle user responses to previous prompts from the AppController.
+    This function should be called from the main respond function when
+    the system is in a dialog flow with the user about application control.
+    """
+    # controller = AppController()
+    
+    # Check the last context to determine what type of response we're handling
+    context_type = None
+    if controller.last_context:
+        context_type = controller.last_context.get("type")
+    
+    if context_type is None:
+        # No active context, treat as a new command
+        return None
+    
+    # Handle based on context type
+    if context_type in ["app_selection", "confirm_open", "no_matches", "store_search", "store_search_yes"]:
+        # These are related to opening applications
+        response, status = controller.handle_user_response(voice_data)
+        return response
+    elif context_type in ["window_selection", "browser_windows", "browser_confirm_all", 
+                         "multiple_instances", "app_selection_close", "force_close_selection"]:
+        # These are related to closing applications
+        response, status = controller.handle_close_response(voice_data)
+        return response
+    
+    # If we don't recognize the context type, return None to let normal command processing occur
+    return None
 
-    # === Try closing a search query ===
-    for entry in search_history:
-        if entry["query"].lower() in to_close.lower():
-            try:
-                for w in gw.getWindowsWithTitle(entry["query"]):
-                    if entry["query"].lower() in w.title.lower():
-                        w.activate()
-                        time.sleep(0.5)
-                        pyautogui.hotkey("ctrl", "w")
-                        break
-                search_history.remove(entry)
-                reply(f"Closed search: {entry['query']}")
-            except Exception as e:
-                print(f"Error closing tab for {entry['query']}:", e)
-                reply(f"Couldn't close the search: {entry['query']}")
-            return
+def handle_force_close_command(voice_data, entities):
+    """Handle force closing an unresponsive application"""
+    controller = AppController()
+    
+    # Extract what user wants to force close
+    target = None
+    if "object" in entities:
+        target = entities["object"]
+    else:
+        # Try to extract from voice data
+        for phrase in ["force close", "kill", "force stop", "force quit"]:
+            if phrase in voice_data:
+                target = voice_data.split(phrase, 1)[-1].strip()
+                break
+    
+    if not target:
+        return "Which application would you like to force close?"
+    
+    response, status = controller.force_close_application(target)
+    return response
 
-    reply("I couldn't find what you want to close.")
+def handle_list_apps_command():
+    """Handle command to list running applications"""
+    controller = AppController()
+    response, _ = controller.get_running_applications()
+    return response
 
 def respond(voice_data):
     """Interpret voice command and execute corresponding action."""
@@ -221,7 +240,19 @@ def respond(voice_data):
             wish()
         return
     
+    # Check if this is a response to an ongoing application control dialog
+    response = handle_user_response(voice_data)
+    if response is not None:
+        try:
+            app.eel.addUserMsg(voice_data)
+        except Exception as e:
+            print("Error updating user message in GUI:", e)
+        from voice_assistant.features.utils import reply
+        reply(response)
+        return
+    
     # Preprocess the command
+    # from command_handler import preprocess_command
     voice_data = preprocess_command(voice_data)
     
     # Extract intent and entities
@@ -229,26 +260,39 @@ def respond(voice_data):
     intent, entities = get_intent(voice_data)
     
     if intent == "unknown":
+        from voice_assistant.features.utils import reply
         reply("I didn't understand that. Could you please repeat?")
         return
 
     try:
+        from voice_assistant.features.utils import reply
+        
         # Route to the appropriate handler based on intent
         if intent == "time":
-            handle_time_command()
+            from command_handler import handle_time_command
+            reply(handle_time_command())
         elif intent == "date":
-            handle_date_command()
+            from command_handler import handle_date_command
+            reply(handle_date_command())
         elif intent == "search":
-            handle_search_command(voice_data, entities)
+            from command_handler import handle_search_command
+            reply(handle_search_command(voice_data, entities))
         elif intent == "copy":
-            handle_copy_command()
+            from command_handler import handle_copy_command
+            reply(handle_copy_command())
         elif intent == "paste":
-            handle_paste_command()
+            from command_handler import handle_paste_command
+            reply(handle_paste_command())
         elif intent == "open":
-            handle_open_command(voice_data, entities)
-        elif intent == "exit":
-            handle_exit_command(voice_data)
+            reply(handle_open_command(voice_data, entities))
+        elif intent == "exit" or intent == "close":
+            reply(handle_close_command(voice_data, entities))
+        elif "force" in voice_data and ("close" in voice_data or "kill" in voice_data):
+            reply(handle_force_close_command(voice_data, entities))
+        elif ("list" in voice_data or "show" in voice_data) and "app" in voice_data:
+            reply(handle_list_apps_command())
             
     except Exception as e:
-        print("Error executing command:", e)
+        logger.error(f"Error executing command: {e}")
+        from voice_assistant.features.utils import reply
         reply("There was an error processing your command. Please try again.")

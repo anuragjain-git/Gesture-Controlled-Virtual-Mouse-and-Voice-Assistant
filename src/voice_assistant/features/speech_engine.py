@@ -21,7 +21,7 @@ def record_audio():
             print("[Recognized]:", voice_text)
             return voice_text.lower()
         except sr.RequestError:
-            from utils import reply
+            from voice_assistant.features.utils import reply
             reply("Sorry, my service is down. Please check your internet connection.")
         except sr.UnknownValueError:
             print("Could not understand audio.")
