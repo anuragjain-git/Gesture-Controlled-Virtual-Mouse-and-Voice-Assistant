@@ -17,3 +17,7 @@ build/
 
 # Ignore logs and cache
 *.log
+
+#files
+app_history.json
+installed_apps_cache.json

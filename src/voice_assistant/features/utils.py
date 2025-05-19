@@ -14,16 +14,36 @@ today = date.today()
 
 def reply(text):
     """Sends a response to both the GUI and TTS, and logs output to the console."""
-    try:
-        app.ChatBot.addAppMsg(text)
-    except Exception as e:
-        print("GUI Error:", e)
-    print("[Reply]:", text)
-    try:
-        engine.say(text)
-        engine.runAndWait()
-    except Exception as e:
-        print("TTS Error:", e)
+    if text != None:
+        if isinstance(text, tuple):
+            if text[1] :
+                try:
+                    app.ChatBot.addAppMsg(text[0])
+                except Exception as e:
+                    print("GUI Error:", e)
+                print("[Reply]:", text[0])
+            else :
+                try:
+                    app.ChatBot.addAppMsg(text[0])
+                except Exception as e:
+                    print("GUI Error:", e)
+                print("[Reply]:", text[0])
+                try:
+                    engine.say(text[0])
+                    engine.runAndWait()
+                except Exception as e:
+                    print("TTS Error:", e)
+        else :
+            try:
+                app.ChatBot.addAppMsg(text)
+            except Exception as e:
+                print("GUI Error:", e)
+            print("[Reply]:", text)
+            try:
+                engine.say(text)
+                engine.runAndWait()
+            except Exception as e:
+                print("TTS Error:", e)
 
 def wish():
     """Greets the user based on current time."""
