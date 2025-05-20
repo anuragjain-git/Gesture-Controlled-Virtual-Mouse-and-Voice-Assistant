@@ -14,9 +14,9 @@ def record_audio():
             r.energy_threshold = 500
             r.dynamic_energy_threshold = False
             r.pause_threshold = 0.8
-            r.adjust_for_ambient_noise(source, duration=0.5)
+            r.adjust_for_ambient_noise(source, duration=1)
             # Reduced phrase time limit to 3 seconds
-            audio = r.listen(source, phrase_time_limit=3)
+            audio = r.listen(source, phrase_time_limit=5)
             voice_text = r.recognize_google(audio)
             print("[Recognized]:", voice_text)
             return voice_text.lower()
