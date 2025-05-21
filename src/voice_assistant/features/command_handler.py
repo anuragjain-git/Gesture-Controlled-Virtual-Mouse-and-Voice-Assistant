@@ -271,6 +271,7 @@ from datetime import datetime
 from threading import Thread
 import logging
 
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('app_control')
@@ -279,10 +280,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import app
 from voice_assistant.features.utils import reply
-from voice_assistant.features.constants import WAKE_WORDS
+from voice_assistant.features.constants import WAKE_WORDS, IS_BROWSING
 from gesture_control import Gesture_Controller
 from voice_assistant.features.app_control_system import AppController
 from voice_assistant.features.file_controller_system import FileAutomation
+from voice_assistant.features.chrome_tab_manager import main
 
 controller = AppController()
 fileController = FileAutomation()
@@ -290,6 +292,7 @@ fileController = FileAutomation()
 # Global state
 keyboard = Controller()
 is_awake = True
+
 search_history = []  # List of dicts: {"query": "...", "tab": tab_object}
 opened_apps = []  # List of app names opened
 
@@ -499,7 +502,8 @@ def handle_fileAutomation_command(voice_data):
 def respond(voice_data):
     """Interpret voice command and execute corresponding action."""
     global is_awake
-    
+    global IS_BROWSING
+
     # Handle sleep/wake functionality
     if not is_awake:
         if "wake up" in voice_data:
@@ -535,41 +539,61 @@ def respond(voice_data):
     try:
         from voice_assistant.features.utils import reply
         
-        # Route to the appropriate handler based on intent
-        if intent == "time":
-            # from command_handler import handle_time_command
-            reply(handle_time_command())
-        elif intent == "date":
-            # from command_handler import handle_date_command
-            reply(handle_date_command())
-        elif intent == "search":
-            # from command_handler import handle_search_command
-            reply(handle_search_command(voice_data, entities))
-        elif intent == "copy":
-            if "file" in voice_data or "folder" in voice_data :
-                reply(handle_fileAutomation_command(voice_data))
-            else :
-                from command_handler import handle_copy_command
-                reply(handle_copy_command())
-        elif intent == "paste":
-            if "file" in voice_data or "folder" in voice_data :
-                reply(handle_fileAutomation_command(voice_data))
-            else :
-                # from command_handler import handle_paste_command
-                reply(handle_paste_command())
-        elif intent == "file":
-            reply(handle_fileAutomation_command(voice_data))
-        elif intent == "open":
-            if "file" in voice_data or "folder" in voice_data :
-                reply(handle_fileAutomation_command(voice_data))
+        if IS_BROWSING:
+            if intent == "exit":
+                if "close" in voice_data:
+                    reply(main(voice_data))
+                elif "exit" in voice_data:
+                    IS_BROWSING = False
+                    reply(main(voice_data))
+            elif intent == "search":
+                reply(main(voice_data))
             else:
-                reply(handle_open_command(voice_data, entities))
-        elif intent == "exit" or intent == "close":
-            reply(handle_close_command(voice_data, entities))
-        elif "force" in voice_data and ("close" in voice_data or "kill" in voice_data):
-            reply(handle_force_close_command(voice_data, entities))
-        elif ("list" in voice_data or "show" in voice_data) and "app" in voice_data:
-            reply(handle_list_apps_command())
+                reply(f'You are in Browsing mode say "echo exit" to exit Browsing mode')
+
+        else :
+            # Route to the appropriate handler based on intent
+            if intent == "time":
+                # from command_handler import handle_time_command
+                reply(handle_time_command())
+            elif intent == "date":
+                # from command_handler import handle_date_command
+                reply(handle_date_command())
+            elif intent == "search":
+                # from command_handler import handle_search_command
+                reply(handle_search_command(voice_data, entities))
+            elif intent == "copy":
+                if "file" in voice_data or "folder" in voice_data :
+                    reply(handle_fileAutomation_command(voice_data))
+                else :
+                    from command_handler import handle_copy_command
+                    reply(handle_copy_command())
+            elif intent == "paste":
+                if "file" in voice_data or "folder" in voice_data :
+                    reply(handle_fileAutomation_command(voice_data))
+                else :
+                    # from command_handler import handle_paste_command
+                    reply(handle_paste_command())
+            elif intent == "file":
+                reply(handle_fileAutomation_command(voice_data))
+
+
+            elif intent == "open":
+                if "file" in voice_data or "folder" in voice_data :
+                    reply(handle_fileAutomation_command(voice_data))
+                elif "chrome" in voice_data:
+                    IS_BROWSING = True
+                    reply("Browsing mode on")
+                    reply(main(voice_data))
+                else:
+                    reply(handle_open_command(voice_data, entities))
+
+            elif intent == "exit" or intent == "close":
+                reply(handle_close_command(voice_data, entities))
+            elif "force" in voice_data and ("close" in voice_data or "kill" in voice_data):
+                reply(handle_force_close_command(voice_data, entities))
+            elif ("list" in voice_data or "show" in voice_data) and "app" in voice_data:
+                reply(handle_list_apps_command())
             
     except Exception as e:
         logger.error(f"Error executing command: {e}")
