@@ -16,3 +16,5 @@ COMMAND_SYNONYMS = {
     "exit": ["exit", "terminate", "stop", "close"],
     # Add more intents and synonyms as needed
 }
+
+IS_BROWSING = False
