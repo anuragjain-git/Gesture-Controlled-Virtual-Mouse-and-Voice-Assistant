@@ -14,45 +14,45 @@ class ChromeTabManager:
         self.is_base_used = False
 
     def start_browser(self):
-        try:
-            if self.driver is None:
-                options = Options()
-                options.add_experimental_option("excludeSwitches", ["enable-automation"])
-                options.add_experimental_option("useAutomationExtension", False)
-                options.add_argument("--disable-blink-features=AutomationControlled")
-                options.add_argument("--remote-debugging-port=9222")
-                options.add_argument("--no-first-run")
-                options.add_argument("--no-default-browser-check")
-
-                self.driver = webdriver.Chrome(
-                    service=Service(ChromeDriverManager().install()), options=options
-                )
-                self.driver.get("chrome://newtab")  # or use "about:blank"
-                self.base_handle = self.driver.current_window_handle
-                return "Chrome opened."
-            else:
-                return "Chrome is already open."
-        except Exception as e:
-            return f"Failed to open Chrome: {e}"
-
-    def search(self, queries):
+        # try:
         if self.driver is None:
-            return "Chrome is not open. Use 'open chrome' first."
+            options = Options()
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option("useAutomationExtension", False)
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            # options.add_argument("--remote-debugging-port=9222")
+            options.add_argument("--no-first-run")
+            options.add_argument("--no-default-browser-check")
+
+            self.driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()), options=options
+            )
+            # self.driver.get("chrome://newtab")  # or use "about:blank"
+            self.base_handle = self.driver.current_window_handle
+            # return "Chrome opened."
+            # else:
+            #     return "Chrome is already open."
+        # except Exception as e:
+        #     return f"Failed to open Chrome: {e}"
+
+    def search(self, query):
+        if self.driver is None:
+            self.start_browser()
 
         try:
             self.driver.minimize_window()
-            for i, query in enumerate(queries):
-                if not self.is_base_used:
-                    self.driver.get(f"https://www.google.com/search?q={query}")
-                    self.tabs[query] = self.base_handle
-                    self.is_base_used = True
-                else:
-                    self.driver.execute_script("window.open('');")
-                    self.driver.switch_to.window(self.driver.window_handles[-1])
-                    self.driver.get(f"https://www.google.com/search?q={query}")
-                    self.tabs[query] = self.driver.current_window_handle
+            if not self.is_base_used:
+                self.driver.get(f"https://www.google.com/search?q={query}")
+                self.tabs[query] = self.base_handle
+                self.is_base_used = True
+            else:
+                self.driver.execute_script("window.open('');")
+                self.driver.switch_to.window(self.driver.window_handles[-1])
+                self.driver.get(f"https://www.google.com/search?q={query}")
+                self.tabs[query] = self.driver.current_window_handle
+            self.driver.maximize_window()
             self.driver.switch_to.window(self.driver.window_handles[-1])
-            return f"Searched: {', '.join(queries)}"
+            return f"Searched: {query}"
         except Exception as e:
             return f"Search failed: {e}"
 
@@ -119,8 +119,23 @@ class ChromeTabManager:
 # Global instance
 manager = ChromeTabManager()
 
-def main(voice_data):
+def main(voice_data, task):
     try:
+
+        if task == "search" or task == "open":
+            return manager.search(voice_data)
+        elif task == "list":
+            return manager.list_tabs()
+        elif task == "close":
+            return manager.close_tab(voice_data)
+        elif task == "exit":
+            return manager.quit()
+        else:
+            return "Unknown command."
+        
+        # if task == "open":
+        #     return manager.search(queries)
+        
         cmd = voice_data.strip().lower()
 
         if cmd.startswith("open"):

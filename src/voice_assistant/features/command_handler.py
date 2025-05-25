@@ -342,7 +342,8 @@ def handle_search_command(voice_data, entities):
 
     if query:
         reply(f"Searching for {query}")
-        webbrowser.open(f"https://google.com/search?q={query}")
+        # webbrowser.open(f"https://google.com/search?q={query}")
+        reply(main(query, "search"))
         search_history.append({"query": query})
     else:
         reply("What would you like me to search for?")
@@ -387,6 +388,8 @@ def handle_open_command(voice_data, entities):
                 target = voice_data.split(word, 1)[-1].strip()
                 break
     
+    if "chrome" in target:
+        return reply(main(" ", "open"))
     if not target:
         return "What application would you like to open?"
     
@@ -399,6 +402,8 @@ def handle_close_command(voice_data, entities):
     Handle closing applications.
     This is an enhanced version of the original function to use the AppController.
     """
+    global IS_BROWSING
+
     controller = AppController()
     
     # Check if it's meant to stop the assistant
@@ -426,6 +431,17 @@ def handle_close_command(voice_data, entities):
             if word in voice_data:
                 target = voice_data.split(word, 1)[-1].strip()
                 break
+    
+    from voice_assistant.features.utils import reply
+    if IS_BROWSING:
+        if "exit" in voice_data and "chrome" in target:
+            IS_BROWSING = False
+            reply(main(target, "exit"))
+        elif target:
+            reply(main(target, "close"))
+        else:
+            reply(main(target, "list"))
+        return
     
     if not target:
         # Show running applications
@@ -539,61 +555,62 @@ def respond(voice_data):
     try:
         from voice_assistant.features.utils import reply
         
-        if IS_BROWSING:
-            if intent == "exit":
-                if "close" in voice_data:
-                    reply(main(voice_data))
-                elif "exit" in voice_data:
-                    IS_BROWSING = False
-                    reply(main(voice_data))
-            elif intent == "search":
-                reply(main(voice_data))
-            else:
-                reply(f'You are in Browsing mode say "echo exit" to exit Browsing mode')
+        # if IS_BROWSING:
+        #     if intent == "exit":
+        #         if "close" in voice_data:
+        #             reply(main(voice_data))
+        #         elif "exit" in voice_data:
+        #             IS_BROWSING = False
+        #             reply(main(voice_data))
+        #     elif intent == "search":
+        #         reply(main(voice_data))
+        #     else:
+        #         reply(f'You are in Browsing mode say "echo exit" to exit Browsing mode')
 
-        else :
-            # Route to the appropriate handler based on intent
-            if intent == "time":
-                # from command_handler import handle_time_command
-                reply(handle_time_command())
-            elif intent == "date":
-                # from command_handler import handle_date_command
-                reply(handle_date_command())
-            elif intent == "search":
-                # from command_handler import handle_search_command
-                reply(handle_search_command(voice_data, entities))
-            elif intent == "copy":
-                if "file" in voice_data or "folder" in voice_data :
-                    reply(handle_fileAutomation_command(voice_data))
-                else :
-                    from command_handler import handle_copy_command
-                    reply(handle_copy_command())
-            elif intent == "paste":
-                if "file" in voice_data or "folder" in voice_data :
-                    reply(handle_fileAutomation_command(voice_data))
-                else :
-                    # from command_handler import handle_paste_command
-                    reply(handle_paste_command())
-            elif intent == "file":
+        
+        # Route to the appropriate handler based on intent
+        if intent == "time":
+            # from command_handler import handle_time_command
+            reply(handle_time_command())
+        elif intent == "date":
+            # from command_handler import handle_date_command
+            reply(handle_date_command())
+        elif intent == "search":
+            # from command_handler import handle_search_command
+            IS_BROWSING = True
+            # reply("Browsing mode on")
+            handle_search_command(voice_data, entities)
+        elif intent == "copy":
+            if "file" in voice_data or "folder" in voice_data :
                 reply(handle_fileAutomation_command(voice_data))
+            else :
+                from command_handler import handle_copy_command
+                reply(handle_copy_command())
+        elif intent == "paste":
+            if "file" in voice_data or "folder" in voice_data :
+                reply(handle_fileAutomation_command(voice_data))
+            else :
+                # from command_handler import handle_paste_command
+                reply(handle_paste_command())
+        elif intent == "file":
+            reply(handle_fileAutomation_command(voice_data))
 
 
-            elif intent == "open":
-                if "file" in voice_data or "folder" in voice_data :
-                    reply(handle_fileAutomation_command(voice_data))
-                elif "chrome" in voice_data:
-                    IS_BROWSING = True
-                    reply("Browsing mode on")
-                    reply(main(voice_data))
-                else:
-                    reply(handle_open_command(voice_data, entities))
+        elif intent == "open":
+            if "file" in voice_data or "folder" in voice_data :
+                reply(handle_fileAutomation_command(voice_data))
+            elif "chrome" in voice_data:
+                IS_BROWSING = True
+                reply("Browsing mode on")
+                # reply(main(voice_data))
+                handle_open_command(voice_data, entities)
 
-            elif intent == "exit" or intent == "close":
-                reply(handle_close_command(voice_data, entities))
-            elif "force" in voice_data and ("close" in voice_data or "kill" in voice_data):
-                reply(handle_force_close_command(voice_data, entities))
-            elif ("list" in voice_data or "show" in voice_data) and "app" in voice_data:
-                reply(handle_list_apps_command())
+        elif intent == "exit" or intent == "close":
+            reply(handle_close_command(voice_data, entities))
+        elif "force" in voice_data and ("close" in voice_data or "kill" in voice_data):
+            reply(handle_force_close_command(voice_data, entities))
+        elif ("list" in voice_data or "show" in voice_data) and "app" in voice_data:
+            reply(handle_list_apps_command())
             
     except Exception as e:
         logger.error(f"Error executing command: {e}")
