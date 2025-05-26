@@ -102,7 +102,7 @@ class ChromeTabManager:
                 self.tabs[message] = self.driver.current_window_handle
             self.driver.maximize_window()
             self.driver.switch_to.window(self.driver.window_handles[-1])
-            return f"Sent a message on whatsapp to {message}."
+            return f"Sent a message on whatsapp to {contact_name}."
         except Exception as e:
             return f"Search failed: {e}"
 

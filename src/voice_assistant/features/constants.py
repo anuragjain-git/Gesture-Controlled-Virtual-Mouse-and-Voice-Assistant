@@ -14,8 +14,9 @@ COMMAND_SYNONYMS = {
     "copy": ["copy"],
     "paste": ["paste"],
     "exit": ["exit", "terminate", "stop", "close"],
-    # "send": ["send"]
+    "mode": ["turn", "turn on", "turnon", "switch", "switchon", "switch on", "switch to"]
     # Add more intents and synonyms as needed
 }
 
 IS_BROWSING = False
+SELF_MODE = False

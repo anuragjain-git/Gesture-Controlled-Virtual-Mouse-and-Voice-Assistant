@@ -47,7 +47,25 @@ def get_intent(voice_data):
             if token.dep_ == "dobj":
                 entities["object"] = token.text
                 print("[Fallback Entity - dobj]:", token.text)
-                break
+
+            if token.dep_ == "prep":
+                phrase = token.text
+                for child in token.subtree:
+                    if child != token:
+                        phrase += " " + child.text
+                entities["prep"] = phrase
+                print("[Prepositional Phrase]:", phrase)
+
+        # Handle conjunctions (like "and good ratings")
+        if "prep" not in entities:
+            for token in doc:
+                if token.dep_ == "cc":
+                    conj_phrase = token.text
+                    for sibling in token.head.subtree:
+                        if sibling != token and sibling != token.head:
+                            conj_phrase += " " + sibling.text
+                    entities["prep"] = conj_phrase
+                    print("[Conjunction Phrase]:", conj_phrase)
 
     # --- WhatsApp Special Detection ---
     if "whatsapp" in voice_data.lower() and intent == "unknown":

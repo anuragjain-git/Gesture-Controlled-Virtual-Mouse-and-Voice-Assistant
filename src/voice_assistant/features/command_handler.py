@@ -280,7 +280,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import app
 from voice_assistant.features.utils import reply
-from voice_assistant.features.constants import WAKE_WORDS, IS_BROWSING
+from voice_assistant.features.constants import WAKE_WORDS, IS_BROWSING, SELF_MODE
 from gesture_control import Gesture_Controller
 from voice_assistant.features.app_control_system import AppController
 from voice_assistant.features.file_controller_system import FileAutomation
@@ -325,6 +325,9 @@ def handle_date_command():
 def handle_search_command(voice_data, entities):
     """Handle search command using either entity extraction or fallback."""
     # Fallback check for synonyms: "search", "find", "look"
+
+    global SELF_MODE
+
     for word in ["search", "find", "look"]:
         if word in voice_data:
             fallback = voice_data.split(word, 1)[-1].strip()
@@ -340,8 +343,17 @@ def handle_search_command(voice_data, entities):
     # Remove trailing punctuation (?, ., !)
     query = query.rstrip(string.punctuation)
 
+    from voice_assistant.features.utils import reply
     if query:
-        reply(f"Searching for {query}")
+        if SELF_MODE and search_history:
+            if "prep" not in entities:
+                entities_with_prep = ","+" "+entities.get("object", "")
+            else:
+                entities_with_prep = entities.get("prep", "")
+            query = search_history[-1]["query"] + " " + entities_with_prep
+            reply(f"Searching for {query}")    
+        else:
+            reply(f"Searching for {query}")
         # webbrowser.open(f"https://google.com/search?q={query}")
         reply(main(query, "search"))
         search_history.append({"query": query})
@@ -519,6 +531,7 @@ def respond(voice_data):
     """Interpret voice command and execute corresponding action."""
     global is_awake
     global IS_BROWSING
+    global SELF_MODE
 
     # Handle sleep/wake functionality
     if not is_awake:
@@ -551,6 +564,19 @@ def respond(voice_data):
         from voice_assistant.features.utils import reply
         reply("I didn't understand that. Could you please repeat?")
         return
+    
+    if intent == "mode":
+        from voice_assistant.features.utils import reply
+        if "self" in voice_data or "selfmode" in voice_data or "safe mode" in voice_data:
+            if not "off" in voice_data or not "of" in voice_data:
+                IS_BROWSING = True
+                SELF_MODE = True
+                reply("Self Mode On")
+            else:
+                SELF_MODE = False
+                reply("Self Mode Off")
+        else:
+            reply("I could not understand that can you please repeat?")
     
     if intent == "msg_whatsapp":
         if not IS_BROWSING:
