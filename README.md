@@ -6,11 +6,11 @@ This project is an innovative solution that allows users to control their comput
 
 ## 🎥 Demo
 
-[Click here to watch the demo video](https://www.youtube.com/watch?v=bEe2g1_aVQ)
+[Click here to watch the demo video](https://www.youtube.com/watch?v=yW5z-O1fA40)
 
 Or preview it below:
 
-[![Demo Video](https://img.youtube.com/vi/bEe2g1_aVQQ/0.jpg)](https://www.youtube.com/watch?v=bEe2g1_aVQQ)
+[![Demo Video](https://img.youtube.com/vi/yW5z-O1fA40/0.jpg)](https://www.youtube.com/watch?v=yW5z-O1fA40)
 
 
 ## Features
