@@ -47,7 +47,66 @@ def get_intent(voice_data):
             if token.dep_ == "dobj":
                 entities["object"] = token.text
                 print("[Fallback Entity - dobj]:", token.text)
-                break
+
+            if token.dep_ == "prep":
+                phrase = token.text
+                for child in token.subtree:
+                    if child != token:
+                        phrase += " " + child.text
+                entities["prep"] = phrase
+                print("[Prepositional Phrase]:", phrase)
+
+        # Handle conjunctions (like "and good ratings")
+        if "prep" not in entities:
+            for token in doc:
+                if token.dep_ == "cc":
+                    conj_phrase = token.text
+                    for sibling in token.head.subtree:
+                        if sibling != token and sibling != token.head:
+                            conj_phrase += " " + sibling.text
+                    entities["prep"] = conj_phrase
+                    print("[Conjunction Phrase]:", conj_phrase)
+
+    # --- WhatsApp Special Detection ---
+    if "whatsapp" in voice_data.lower() and intent == "unknown":
+        intent = "msg_whatsapp"
+
+    # --- Extract Recipient Name and Message ---
+    recipient = None
+    message = None
+
+    prepositions = ["to", "on", "via", "with"]
+    
+    # Look for the message after "send"
+    if "send" in voice_data.lower():
+        try:
+            send_index = [i for i, token in enumerate(doc) if token.lemma_ == "send"][0]
+            # Extract message (up to 'to' or 'on')
+            message_tokens = []
+            for token in doc[send_index + 1:]:
+                if token.text in ["to", "on", "via", "with", "using"]:
+                    break
+                message_tokens.append(token.text)
+            message = " ".join(message_tokens).strip("'\" ")
+        except Exception as e:
+            pass
+
+    # Extract recipient name (after 'to', 'on', 'via', etc.)
+    for token in doc:
+        if token.text.lower() in prepositions:
+            recipient_tokens = []
+            for t in doc[token.i + 1:]:
+                if t.text.lower() in prepositions + ["whatsapp"]:
+                    break
+                recipient_tokens.append(t.text)
+            recipient = " ".join(recipient_tokens).strip("'\" ")
+            break
+
+    # --- Final Entities ---
+    if message:
+        entities["message"] = message
+    if recipient:
+        entities["recipient"] = recipient
 
     print("[Intent]:", intent, "[Entities]:", entities)
     return intent, entities

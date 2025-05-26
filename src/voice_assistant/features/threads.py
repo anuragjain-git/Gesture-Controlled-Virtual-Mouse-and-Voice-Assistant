@@ -27,7 +27,8 @@ def chat_reader():
         if app.ChatBot.isUserInput():
             voice_data = app.ChatBot.popUserInput()
             if voice_data:
-                command_queue.put(voice_data)
+                if any(wake in voice_data for wake in WAKE_WORDS):
+                    command_queue.put(voice_data)
         time.sleep(0.2)  # Check frequently without overloading the CPU.
 
 def start_threads():
