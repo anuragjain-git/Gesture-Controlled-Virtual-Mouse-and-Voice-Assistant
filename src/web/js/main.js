@@ -21,12 +21,15 @@ function addUserMsg(msg) {
 }
 function addAppMsg(msg) {
     element = document.getElementById("messages");
-    element.innerHTML += '<div class="message to ready ltor">' + msg + '</div>';
+    // 🟢 Replace newlines with <br> tags
+    const formattedMsg = msg.replace(/\n/g, "<br>");
+    element.innerHTML += '<div class="message to ready ltor">' + formattedMsg + '</div>';
     element.scrollTop = element.scrollHeight - element.clientHeight - 15;
     //add delay for animation to complete and then modify class to => "message to"
     index = element.childElementCount - 1;
     setTimeout(changeClass.bind(null, element, index, "message to"), 500);
 }
+
 function changeClass(element, index, newClass) {
     console.log(newClass +' '+ index);
     element.children[index].className = newClass;
