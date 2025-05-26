@@ -2,7 +2,7 @@
 
 This project is an innovative solution that allows users to control their computer system using both hand gestures and voice commands.
 - **Gesture-Controlled Virtual Mouse**: Move the mouse, click, scroll, and drag and more.
-- **Voice Assistant**: Perform system tasks like opening Google, searching queries, sending whatsapp messages, file handling, system settings and more.
+- **Voice Assistant**: Perform system tasks like google search, sending whatsapp messages, file handling, system settings and more.
 
 ## Features
 ### Hand Gesture Recognition
