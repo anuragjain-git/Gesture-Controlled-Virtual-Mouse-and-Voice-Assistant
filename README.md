@@ -4,6 +4,10 @@ This project is an innovative solution that allows users to control their comput
 - **Gesture-Controlled Virtual Mouse**: Move the mouse, click, scroll, and drag and more.
 - **Voice Assistant**: Perform system tasks like google search, sending whatsapp messages, file handling, system settings and more.
 
+
+[![Demo Video](https://img.youtube.com/vi/bEe2g1_aVQQ/0.jpg)](https://www.youtube.com/watch?v=bEe2g1_aVQQ)
+
+
 ## Features
 ### Hand Gesture Recognition
 | Gesture | Action |
