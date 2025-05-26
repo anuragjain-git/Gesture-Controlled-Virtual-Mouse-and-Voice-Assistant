@@ -14,6 +14,7 @@ COMMAND_SYNONYMS = {
     "copy": ["copy"],
     "paste": ["paste"],
     "exit": ["exit", "terminate", "stop", "close"],
+    # "send": ["send"]
     # Add more intents and synonyms as needed
 }
 

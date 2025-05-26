@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 import time
 import re
 
@@ -40,7 +41,6 @@ class ChromeTabManager:
             self.start_browser()
 
         try:
-            self.driver.minimize_window()
             if not self.is_base_used:
                 self.driver.get(f"https://www.google.com/search?q={query}")
                 self.tabs[query] = self.base_handle
@@ -53,6 +53,56 @@ class ChromeTabManager:
             self.driver.maximize_window()
             self.driver.switch_to.window(self.driver.window_handles[-1])
             return f"Searched: {query}"
+        except Exception as e:
+            return f"Search failed: {e}"
+
+
+    def whatsapp(self, message, contact_name):
+        if self.driver is None:
+            self.start_browser()
+
+        try:
+            if not self.is_base_used:
+                self.driver.get('https://web.whatsapp.com/')
+                time.sleep(40)
+                # contact_name = "Subham Tiwari"
+                search_box = self.driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]')
+                search_box.click()
+                search_box.send_keys(contact_name)
+                search_box.send_keys(Keys.ENTER)
+                time.sleep(2)
+
+                # Send message
+                # message = "Testing 1.0: Hello from Echo, testing auto messaging using Echo."
+                message_box = self.driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
+                message_box.click()
+                message_box.send_keys(message)
+                message_box.send_keys(Keys.ENTER)
+
+                self.tabs[message] = self.base_handle
+                self.is_base_used = True
+            else:
+                self.driver.execute_script("window.open('');")
+                self.driver.switch_to.window(self.driver.window_handles[-1])
+                self.driver.get('https://web.whatsapp.com/')
+                time.sleep(40)
+                # contact_name = "Subham Tiwari"
+                search_box = self.driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]')
+                search_box.click()
+                search_box.send_keys(contact_name)
+                search_box.send_keys(Keys.ENTER)
+                time.sleep(2)
+
+                # Send message
+                # message = "Testing 1.0: Hello from Echo, testing auto messaging using Echo."
+                message_box = self.driver.find_element(By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]')
+                message_box.click()
+                message_box.send_keys(message)
+                message_box.send_keys(Keys.ENTER)
+                self.tabs[message] = self.driver.current_window_handle
+            self.driver.maximize_window()
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            return f"Sent a message on whatsapp to {message}."
         except Exception as e:
             return f"Search failed: {e}"
 
@@ -130,6 +180,9 @@ def main(voice_data, task):
             return manager.close_tab(voice_data)
         elif task == "exit":
             return manager.quit()
+        elif task == "msg_whatsapp":
+            message, contact_name = voice_data.split("+", 1)
+            return manager.whatsapp(message, contact_name)
         else:
             return "Unknown command."
         

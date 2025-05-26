@@ -551,6 +551,12 @@ def respond(voice_data):
         from voice_assistant.features.utils import reply
         reply("I didn't understand that. Could you please repeat?")
         return
+    
+    if intent == "msg_whatsapp":
+        if not IS_BROWSING:
+            IS_BROWSING = True
+        from voice_assistant.features.utils import reply
+        reply(main(f"{entities['message']}+{entities['recipient']}", intent))
 
     try:
         from voice_assistant.features.utils import reply
